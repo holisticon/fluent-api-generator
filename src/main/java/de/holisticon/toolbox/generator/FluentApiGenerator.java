@@ -104,13 +104,21 @@ public class FluentApiGenerator {
 
     public void generateFluentClass(final String canonicalClassname) {
         try {
-            generateFluentClass(Class.forName(canonicalClassname));
+            addClass(Class.forName(canonicalClassname));
         } catch (final ClassNotFoundException e) {
             propagate(e);
         }
     }
 
-    public void generateFluentClass(final Class<?> sourceClass) {
+    public void generateCode() {
+        try {
+            codeModel.build(targetDirectory);
+        } catch (final IOException e) {
+            propagate(e);
+        }
+    }
+
+    public FluentApiGenerator addClass(final Class<?> sourceClass) {
         try {
             final JDefinedClass definedClass = codeModel._class(format(DEFAULT_FILENAME_PATTERN, rootpackage.name(), sourceClass.getSimpleName()));
 
@@ -126,13 +134,11 @@ public class FluentApiGenerator {
                     createSettersForSourceClass(definedClass, m, field);
                 }
             }
+            return this;
 
-            codeModel.build(targetDirectory);
         } catch (final JClassAlreadyExistsException e) {
-            // ...
-        } catch (final IOException e) {
-            // ...
-        }
+            throw propagate(e);
+        }            // ...
     }
 
     private Collection<Method> filterMethods(final Class<?> sourceClass) {

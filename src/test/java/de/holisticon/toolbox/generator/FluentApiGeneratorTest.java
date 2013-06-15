@@ -19,7 +19,7 @@ public class FluentApiGeneratorTest {
     public void shouldGenerateSimpleJavaFile() throws IOException {
 
         fluentApiGenerator().rootPackage("d.h").addIgnoredMethodNames("setId", "setParent", "setCurrentBufferedSourceException").build()
-                .generateFluentClass(TextField.class);
+                .addClass(TextField.class).generateCode();
 
         System.out.println(Joiner.on("\n").join(Files.readLines(new File(DEFAULT_TARGET_DIRECTORY + "/d/h/FluentTextField.java"), Charsets.UTF_8)));
     }

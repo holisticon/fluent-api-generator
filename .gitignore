@@ -11,5 +11,6 @@
 #
 # Maven
 #
-target/
+target
 pom.xml.versionsBackup
+

@@ -1,4 +1,4 @@
-fluent-api-generator 1.0.0-SNAPSHOT
+fluent-api-generator
 ====================
 
 Generate fluent api for set() and add() methods via CodeModel. 

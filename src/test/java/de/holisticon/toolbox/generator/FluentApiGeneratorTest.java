@@ -32,7 +32,8 @@ import de.holisticon.toolbox.generator.predicate.MethodPredicates;
 
 public class FluentApiGeneratorTest {
 
-    private static final String PATH = DEFAULT_TARGET_DIRECTORY + "/d/h/FluentTextField.java";
+    private static final String ROOT_PACKAGE = "foo.bar";
+    private static final String PATH = DEFAULT_TARGET_DIRECTORY + "/foo/bar/FluentTextField.java";
 
     private final JavaCompiler systemJavaCompiler = ToolProvider.getSystemJavaCompiler();
     private final Logger logger = LoggerFactory.getLogger(FluentApiGeneratorTest.class);
@@ -40,10 +41,10 @@ public class FluentApiGeneratorTest {
     @Test
     public void shouldGenerateSimpleJavaFile() throws IOException {
 
-        fluentApiGenerator().rootPackage("d.h").addIgnoredMethodNames("setId", "setParent", "setCurrentBufferedSourceException").build()
+        fluentApiGenerator().rootPackage(ROOT_PACKAGE).addIgnoredMethodNames("setId", "setParent", "setCurrentBufferedSourceException").build()
                 .addClass(TextField.class).generateCode();
 
-        System.out.println(Joiner.on("\n").join(Files.readLines(new File(PATH), Charsets.UTF_8)));
+        logger.info(Joiner.on("\n").join(Files.readLines(new File(PATH), Charsets.UTF_8)));
 
         assertTrue(systemJavaCompiler.run(null, null, null, PATH) < 1);
     }
@@ -57,7 +58,7 @@ public class FluentApiGeneratorTest {
         for (final Method m : filter) {
             sorted.add(format("%s(%s)", m.getName(), m.getGenericParameterTypes()[0]));
         }
-        System.out.println(Joiner.on("\n").join(sorted));
+        logger.info(Joiner.on("\n").join(sorted));
         assertThat(filter.size(), is(20));
 
     }

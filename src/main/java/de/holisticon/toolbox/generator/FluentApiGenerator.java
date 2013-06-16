@@ -1,6 +1,7 @@
 package de.holisticon.toolbox.generator;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Throwables.propagate;
 import static com.google.common.collect.Collections2.filter;
 import static com.sun.codemodel.JExpr._new;
@@ -20,10 +21,10 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.lang.reflect.Type;
 import java.text.DateFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Generated;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.sun.codemodel.ClassType;
 import com.sun.codemodel.JBlock;
@@ -52,11 +54,22 @@ import de.holisticon.toolbox.generator.predicate.ConstructorPredicates;
 import de.holisticon.toolbox.generator.predicate.MethodPredicates;
 
 /**
+ * Generator for Fluent api.
+ * Uses the following rules:
+ * <ul>
+ * <li>"public void setFoo(Foo foo)" becomes "foo(Foo foo)"</li>
+ * <li>"public void addFoo(Foo foo)" becomes "addFoos(Foo... foos)" and adds all var args</li>
+ * <li>all public constructors become static factory methods. "public Bar(Foo foo)" becomes "bar(Foo foo)".</li>
+ * </ul>
  * Do not access directly, use {@link FluentApiGeneratorBuilder}.
  * @author Jan Galinski, Holisticon AG
  */
 public class FluentApiGenerator {
 
+    /**
+     * Creates a new builder instance.
+     * @return new builder instance
+     */
     public static FluentApiGeneratorBuilder fluentApiGenerator() {
         return new FluentApiGeneratorBuilder();
     }
@@ -76,11 +89,15 @@ public class FluentApiGenerator {
     private final JCodeModel codeModel = new JCodeModel();
     private final JPackage rootpackage;
 
+    private final Map<Class<?>, JDefinedClass> definedClasses = Maps.newHashMap();
+
     private final File targetDirectory;
 
     private final Predicate<Method> filterApplicableMethods;
 
-    FluentApiGenerator(final File targetDirectory, final String rootPackage, final Set<String> ignoredMethods) {
+    private final String filenamePattern;
+
+    FluentApiGenerator(final File targetDirectory, final String rootPackage, final String filenamePattern, final Set<String> ignoredMethods) {
         checkArgument(targetDirectory != null);
         if (!targetDirectory.exists()) {
             checkArgument(targetDirectory.mkdirs(), format("target directory '%s' could not be created.", targetDirectory.getAbsolutePath()));
@@ -88,11 +105,11 @@ public class FluentApiGenerator {
             checkArgument(targetDirectory.isDirectory());
             checkArgument(targetDirectory.canWrite());
         }
-        checkArgument(isNotBlank(rootPackage));
         checkArgument(ignoredMethods != null);
 
         this.targetDirectory = targetDirectory;
         this.rootpackage = codeModel._package(rootPackage);
+        this.filenamePattern = filenamePattern;
 
         final Predicate<Method> notIgnored = new Predicate<Method>() {
 
@@ -129,7 +146,7 @@ public class FluentApiGenerator {
             this.delegateFieldName = uncapitalize(sourceClassName);
 
             try {
-                final String fullyqualifiedName = format(DEFAULT_FILENAME_PATTERN, rootpackage.name(), sourceClassName);
+                final String fullyqualifiedName = createFQN();
                 definedClass = codeModel._class(PUBLIC_FINAL, fullyqualifiedName, ClassType.CLASS);
                 annotateWithGenerated();
 
@@ -154,6 +171,11 @@ public class FluentApiGenerator {
             } catch (final JClassAlreadyExistsException e) {
                 throw propagate(e);
             }
+        }
+
+        private String createFQN() {
+            final String packageName = isNotBlank(rootpackage.name()) ? rootpackage.name() : sourceClass.getPackage().getName();
+            return format(filenamePattern, packageName, sourceClassName);
         }
 
         private void addFactoryMethodForConstructors() {
@@ -198,12 +220,12 @@ public class FluentApiGenerator {
             final JMethod method = definedClass.method(PUBLIC, definedClass, name);
 
             final Class<?> parameterType = setter.getParameterTypes()[0];
-            final Type genericType = setter.getGenericParameterTypes()[0];
+            // final Type genericType = setter.getGenericParameterTypes()[0];
 
             final JVar param = method.param(FINAL, parameterType, name);
 
             method.body().invoke(delegateField, setter.getName()).arg(param);
-            method.body()._return(_this());
+            returnThis(method.body());
 
             // default for boolean setters
             if (parameterType.getCanonicalName().equals("boolean")) {
@@ -225,11 +247,24 @@ public class FluentApiGenerator {
             final JForEach forEach = block.forEach(param.type().elementType(), loopVariable, param);
             forEach.body().invoke(delegateField, adder.getName()).arg(forEach.var());
 
+            returnThis(block);
+        }
+
+        private void returnThis(final JBlock block) {
             block._return(_this());
         }
+
+        public JDefinedClass getDefinedClass() {
+            return definedClass;
+        }
+
     }
 
-    public void generateFluentClass(final String canonicalClassname) {
+    /**
+     * Delegates to {@link #addClass(Class)}, loads class via {@link Class#forName(String)} first.
+     * @param canonicalClassname the fqn class name. Must exist on classloader
+     */
+    public void addClassByName(final String canonicalClassname) {
         try {
             addClass(Class.forName(canonicalClassname));
         } catch (final ClassNotFoundException e) {
@@ -237,6 +272,9 @@ public class FluentApiGenerator {
         }
     }
 
+    /**
+     * Writes source files for all added defined classes to {@link #targetDirectory}.
+     */
     public void generateCode() {
         try {
             codeModel.build(targetDirectory);
@@ -245,8 +283,13 @@ public class FluentApiGenerator {
         }
     }
 
+    /**
+     * Add source class for generation. Adds defined class to codeModel and creates default fluent setters and getters.
+     * @param sourceClass class used as source for generation
+     * @return this
+     */
     public FluentApiGenerator addClass(final Class<?> sourceClass) {
-        new GeneratedClass(sourceClass);
+        definedClasses.put(sourceClass, new GeneratedClass(sourceClass).getDefinedClass());
         return this;
     }
 
@@ -254,4 +297,14 @@ public class FluentApiGenerator {
         return filter(Sets.newHashSet(sourceClass.getMethods()), filterApplicableMethods);
     }
 
+    /**
+     * Once the default generation is done, the defined classes can be accessed to do project specific modifications if nessecary.
+     * @param sourceClass class used as source for generation
+     * @return defined class
+     */
+    public JDefinedClass getDefinedClass(final Class<?> sourceClass) {
+        final JDefinedClass definedClass = definedClasses.get(sourceClass);
+        checkState(definedClass != null, format("class '%s' was not added to codeModel"));
+        return definedClass;
+    }
 }

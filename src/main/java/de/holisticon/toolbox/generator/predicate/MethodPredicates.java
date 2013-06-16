@@ -1,5 +1,8 @@
 package de.holisticon.toolbox.generator.predicate;
 
+import static com.google.common.base.Predicates.and;
+import static com.google.common.base.Predicates.or;
+import static com.google.common.base.Predicates.not;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
@@ -8,6 +11,14 @@ import com.google.common.base.Predicates;
 
 public enum MethodPredicates implements Predicate<Method> {
 
+    IS_FLUENT_CANDIDATE {
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public boolean apply(final Method method) {
+            return and(IS_PUBLIC, or(PREFIX_IS_ADD, PREFIX_IS_SET), IS_VOID, HAS_ONE_PARAM, NOT_DEPRECATED, not(IS_SYNTHETIC)).apply(method);
+        }
+    },
     /**
      * Rules for setters:
      * <ul>
@@ -23,6 +34,14 @@ public enum MethodPredicates implements Predicate<Method> {
         @SuppressWarnings("unchecked")
         public boolean apply(final Method method) {
             return Predicates.and(IS_PUBLIC, IS_VOID, HAS_ONE_PARAM).apply(method) && method.getName().startsWith(SET);
+        }
+    },
+    IS_ADDER {
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public boolean apply(final Method method) {
+            return Predicates.and(IS_PUBLIC, IS_VOID, HAS_ONE_PARAM).apply(method) && method.getName().startsWith(ADD);
         }
     },
     IS_VOID {
@@ -60,8 +79,39 @@ public enum MethodPredicates implements Predicate<Method> {
             return Modifier.isPublic(method.getModifiers());
         }
     },
+    PREFIX_IS_ADD {
+
+        @Override
+        public boolean apply(final Method method) {
+            return method.getName().startsWith(ADD);
+        }
+
+    },
+    PREFIX_IS_SET {
+
+        @Override
+        public boolean apply(final Method method) {
+            return method.getName().startsWith(SET);
+        }
+
+    },
+    IS_SYNTHETIC {
+
+        @Override
+        public boolean apply(final Method method) {
+            return method.isSynthetic();
+        }
+    },
+    IS_BRIDGED {
+
+        @Override
+        public boolean apply(final Method method) {
+            return method.isBridge();
+        }
+    },
     ;
 
-    private static final String SET = "set";
+    public static final String ADD = "add";
+    public static final String SET = "set";
 
 }

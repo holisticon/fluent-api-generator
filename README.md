@@ -5,12 +5,9 @@ Generate fluent api for set() and add() methods via CodeModel.
 
 [![Build Status](https://secure.travis-ci.org/holisticon/fluent-api-generator.png)](https://travis-ci.org/holisticon/fluent-api-generator)
 ## Introduction
-*Make a clear and concise mission statement about the project:*
 
-- *What problem does it try to fix?*
-- *What are the most important features?*
+Uses JCodeModel to generate FLuent-API for bean/pojo.
 
-*Also important: What is the current state of the project? Is it early development or already future complete and production stable?*
 
 ## Getting started
 *Just some lines of description in prose and code that gets the user up and running with this library.*

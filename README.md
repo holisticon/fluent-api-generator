@@ -1,7 +1,7 @@
 fluent-api-generator
 ====================
 
-Generate fluent api for set() and add() methods via CodeModel. 
+Generate [fluent api](http://www.martinfowler.com/bliki/FluentInterface.html) for set() and add() methods via CodeModel. 
 
 [![Build Status](https://secure.travis-ci.org/holisticon/fluent-api-generator.png)](https://travis-ci.org/holisticon/fluent-api-generator)
 ## Introduction
